@@ -3,18 +3,7 @@
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <script src="http://d3js.org/d3.v3.min.js"></script>
-    <style>
-
-
-        #buttons text {
-            font-size: 40px;
-            text-anchor: middle;
-            fill: white;
-        }
-
-
-    </style>
-
+    
 </head>
 <body>
 
@@ -22,105 +11,139 @@
 
         function tree () {
 
+            //width and height of svg
             var svgWidth = 1200,
                 svgHeight = 600;
 
+            //tree object
             var tree = {
                 cx: 600,
                 cy: 30,
-                w: 100,
-                h: 60,
+                w: 80,
+                h: 50,
                 size: 1,
-                leafDepth: Infinity,
-                nodes: [],
-                links: []
+                leafDepth: 0,
+                nodes: []
             };
 
+            //boolean to toggle depth
             var uniformDepth = false;
-            var addNode = false;
-            var removeNode = false;
-            var changeText = false;
 
+            //store the tree object here when saved
             var JSONData;
+
+            //example tree layout
+            var example = '[{"id":"00","text":"Clause","x":600,"y":30,"kids":[{"id":"id1","text":"Goal","x":250,"y":90,"kids":[{"id":"id2","text":"Ngp","x":250,"y":150,"kids":[{"id":"id3","text":"th","x":250,"y":210,"kids":[{"id":"id4","text":"It","x":250,"y":270,"kids":[],"isLeaf":true,"textWidth":9.765625}],"isLeaf":false,"textWidth":12.4375}],"isLeaf":false,"textWidth":27.546875}],"isLeaf":false,"textWidth":31.09375},{"id":"id5","text":"Pr: material","x":350,"y":90,"kids":[{"id":"id6","text":"was delivered","x":350,"y":150,"kids":[],"isLeaf":true,"textWidth":88.40625}],"isLeaf":false,"textWidth":75.078125},{"id":"id7","text":"Circ: manner","x":700,"y":90,"kids":[{"id":"id8","text":"Advgp","x":500,"y":150,"kids":[{"id":"id10","text":"t","x":450,"y":210,"kids":[{"id":"id12","text":"very","x":450,"y":270,"kids":[],"isLeaf":true,"textWidth":28.421875}],"isLeaf":false,"textWidth":4.4375},{"id":"id11","text":"a","x":550,"y":210,"kids":[{"id":"id13","text":"quickly","x":550,"y":270,"kids":[],"isLeaf":true,"textWidth":47.984375}],"isLeaf":false,"textWidth":7.09375}],"isLeaf":false,"textWidth":43.546875},{"id":"id9","text":"PP","x":800,"y":150,"kids":[{"id":"id14","text":"&","x":650,"y":210,"kids":[{"id":"id17","text":"and","x":650,"y":270,"kids":[],"isLeaf":true,"textWidth":23.09375}],"isLeaf":false,"textWidth":12.4375},{"id":"id15","text":"p","x":750,"y":210,"kids":[{"id":"id18","text":"in","x":750,"y":270,"kids":[],"isLeaf":true,"textWidth":12.4375}],"isLeaf":false,"textWidth":8},{"id":"id16","text":"cv","x":900,"y":210,"kids":[{"id":"id19","text":"Ngp","x":900,"y":270,"kids":[{"id":"id20","text":"m","x":850,"y":330,"kids":[{"id":"id23","text":"Adjgp","x":850,"y":390,"kids":[{"id":"id24","text":"a","x":850,"y":450,"kids":[{"id":"id25","text":"good","x":850,"y":510,"kids":[],"isLeaf":true,"textWidth":32}],"isLeaf":false,"textWidth":7.09375}],"isLeaf":false,"textWidth":40}],"isLeaf":false,"textWidth":12.4375},{"id":"id21","text":"th","x":950,"y":330,"kids":[{"id":"id22","text":"order","x":950,"y":390,"kids":[],"isLeaf":true,"textWidth":33.75}],"isLeaf":false,"textWidth":12.4375}],"isLeaf":false,"textWidth":27.546875}],"isLeaf":false,"textWidth":15.09375}],"isLeaf":false,"textWidth":17.796875}],"isLeaf":false,"textWidth":83.96875}],"isLeaf":false,"textWidth":43.546875}]';
+
             
-            //get the nodes
+            //returns the nodes
             tree.getNodes = function () {
                 var n = [];
                 function getNodes(node) {
-                    n.push({ id: node.id, text: node.text, x: node.x, y: node.y, kids: node.kids, isLeaf: node.isLeaf });
+                    n.push({ id: node.id, text: node.text, x: node.x, y: node.y, kids: node.kids, isLeaf: node.isLeaf, textWidth: node.textWidth });
                     node.kids.forEach(function (kid) { return getNodes(kid); });
                 }
                 getNodes(tree.nodes[0]);
                 return n.sort(function (a, b) { return a.id - b.id; });
-            }
+            } //end tree.getNodes()
 
-            //get the links
+
+            //returns the links
             tree.getLinks = function () {
                 var l = [];
                 function getLinks(node) {
-                    node.kids.forEach(function (kid) { l.push({ fromId: node.id, fromX: node.x, fromY: node.y, toId: kid.id, toX: kid.x, toY: kid.y }); });
+                    node.kids.forEach(function (kid) { if (!kid.isLeaf) { l.push({ fromId: node.id, fromX: node.x, fromY: node.y, toId: kid.id, toX: kid.x, toY: kid.y }); } });
                     node.kids.forEach(getLinks);
                 }
                 getLinks(tree.nodes[0]);
                 return l.sort(function (a, b) { return a.toId - b.toId });
-            }
+            } //end tree.getLinks()
 
-            //add a new leaf
+
+            //returns the triangles
+            tree.getTriangles = function () {
+                var t = [];
+                function getTriangles(node) {
+                    node.kids.forEach(function (kid) { if (kid.isLeaf) { t.push({ fromId: node.id, toId: kid.id, topX: node.x, topY: (node.y + 10), leftX: (kid.x - (kid.textWidth / 2)), leftY: (kid.y - 10), rightX: (kid.x + (kid.textWidth / 2)), rightY: (kid.y - 10) }); } });
+                    node.kids.forEach(getTriangles);
+                }
+                getTriangles(tree.nodes[0]);
+                return t.sort(function (a, b) { return a.toId - b.toId });
+            } //end tree.getTriangles()
+
+
+            //returns node object
+            tree.getNode = function (thisNode) {
+                var n;
+                function getNode(node) {
+                    if (node.id == thisNode.id) { n = node; }
+                    node.kids.forEach(getNode);
+                }
+                getNode(tree.nodes[0]);
+                return n;
+            } //end tree.getNode()
+
+
+            //return nodes text width
+            tree.getTextWidth = function (node, box) {
+                var n = tree.getNode(node);
+                n.textWidth = box.width;
+                return box.width;
+            } //end tree.getTextWidth()
+
+
+            //when node is clicked, check which radio button is checked and run function
+            tree.nodeClicked = function (node) {
+                if(document.getElementById('radio1').checked) {
+                    tree.addLeaf(node)
+                }
+                else if (document.getElementById('radio2').checked) {
+                    tree.removeLeaf(node)
+                }
+                else {
+                    tree.changeText(node);
+                }
+            } //end tree.nodeClicked()
+
+
+            //add a new leaf to node
             tree.addLeaf = function (parent) {
                 tree.size++;
                 function addLeaf(node) {
-                    if (node.id == parent) { node.kids.push({ id: tree.size-1, text: 'Node '+(tree.size - 1), x: node.x, y: node.y, kids: [], isLeaf: true }); node.isLeaf = false; return; }
+                    if (node.id == parent.id) {
+                        node.kids.push({ id: (tree.size - 1), text: 'Node ' + (tree.size - 1), x: node.x, y: node.y, kids: [], isLeaf: true, textWidth: 0 }); node.isLeaf = false;
+                        refresh();
+                        return;
+                    }
                     node.kids.forEach(addLeaf);
-                    redraw();
                 }
                 addLeaf(tree.nodes[0]);
-                reposition(tree.nodes[0]);
-                redraw();
-            }
+            } //end tree.addLeaf()
 
-            //remove leaf (STILL NOT WORKING CORRECTLY)!!!
+
+            //remove leaf
             tree.removeLeaf = function (nodeClicked) {
                 var parent = tree.nodes[0];
                 var visited = [];
-                function removeLeaf(p) {
-                    function arrangeKids(index, numOfKids) {
-                        if (index < numOfKids) {
-                            for (var i = index; i < parent.kids.length; i++) {
-                                parent.kids[i] = parent.kids[i + 1];
-                            }
-                        }
-                        if ((index + 1) == numOfKids == 1) {
-                            parent.isLeaf = true;
-                        }
-                        console.log(parent.kids);
-                        parent.kids.pop();
-                        console.log(parent.kids);
-
-                    }
-                    if (p.id == parent.id) {
-                        for (var i = 0; i < parent.kids.length; i++) {
-                            if (parent.kids[i].id == nodeClicked.id) {
-                                arrangeKids(i, parent.kids.length);
-
-                                reposition(tree.nodes[0]);
-                                redraw();
-                                break;
-                                return;
-                            }
+                function removeLeaf() {
+                    for (var i = 0; i < parent.kids.length; i++) {
+                        if (parent.kids[i].id == nodeClicked.id) { parent.kids.splice(i, 1);
+                            if (parent.kids.length == 0) { parent.isLeaf = true; }
                         }
                     }
-                    p.kids.forEach(removeLeaf);
-                }
+                } //end removeLeaf()
                 function findParent(node) { //finds the parent object of the leaf clicked and saves it to parent variable
                     visited.push(node);
-                    if (node.id == nodeClicked.id) { visited.pop(); parent = visited[visited.length - 1]; removeLeaf(tree.nodes[0]); }
-                    node.kids.forEach(findParent);
-                }
+                    if (node.id == nodeClicked.id) { visited.pop(); parent = visited[visited.length - 1]; removeLeaf(); }
+                    else { node.kids.forEach(findParent); visited.pop(); } //remove nodes down visited paths
 
+                } //end findParent()
                 if (nodeClicked.isLeaf) {
                     findParent(tree.nodes[0]);
+                    refresh();
                 }
-            }
+            } //end tree.removeLeaf()
+
 
             //change node text
             tree.changeText = function (node) {
@@ -132,99 +155,119 @@
                                 .on("blur", function () {
                                     newText = textBox.node().value;
                                     function changeText(n) {
-                                        if (n.id == node.id) { n.text = newText; return; }
+                                        if (n.id == node.id) { n.text = newText; refresh(); return; }
                                         n.kids.forEach(changeText);
                                     }
-                                    tree.nodes[0].kids.forEach(changeText);
-                                    redraw();
+                                    changeText(tree.nodes[0]);
+                                    refresh();
                                     d3.select("foreignObject").remove();
-                                    
                                 })
                                 .on("keypress", function () { 
-                                    if (d3.event.keyCode == 13) {
+                                    if (d3.event.keyCode == 13) { //enter button
                                         var e = d3.event;
                                         //prevents the entire tree from deleting when enter is pressed
                                         if (e.stopPropagation) { e.stopPropagation(); }
                                         e.preventDefault();
 
                                         newText = textBox.node().value;
-                                        tree.nodes[0].kids.forEach(function (kid) {
-                                            if (kid.id == node.id) { kid.text = newText; }
-                                        });
-                                        redraw();
+                                        function changeText(n) {
+                                            if (n.id == node.id) { n.text = newText; refresh(); return; }
+                                            n.kids.forEach(changeText);
+                                        }
+                                        changeText(tree.nodes[0]);
+                                        refresh();
                                         d3.select("foreignObject").remove();
                                     }
                                 });
-            }
+            } //end tree.changeText()
+
 
             //sets leafs depth to deepest leaf
             tree.nodeDepth = function () {
                 var leafs = [];
                 var depth = 0;
-                
+
                 //check if nodes are leafs
                 function nodeDepth(n) {
                     n.kids.forEach(function (kid) {
-                        if (kid.isLeaf) { leafs.push({ id: kid.id });
-                            if (kid.y > depth) { depth = kid.y; }
-                        }
+                        if (kid.isLeaf) { leafs.push({ id: kid.id }); if (kid.y > depth) { depth = kid.y; } }
                     });
                     n.kids.forEach(nodeDepth);
                 }
-                nodeDepth(tree.nodes[0]);
                 function changeDepth(n) {
                     n.kids.forEach(function (kid) {
                         leafs.forEach(function (leaf) { if (kid.id == leaf.id) { kid.y = depth; } })
-                        
                     });
                     n.kids.forEach(changeDepth);
                 }
+
+                nodeDepth(tree.nodes[0]);
                 changeDepth(tree.nodes[0]);
                 tree.leafDepth = depth;
-            }
+            } //end tree.nodeDepth()
+
+
+            //update/refresh svg
+            refresh = function () {
+                d3.select('#nodes').selectAll('text').data(tree.getNodes()).remove();
+                d3.select('#links').selectAll('line').data(tree.getLinks()).remove();
+                d3.select('#triangles').selectAll('polygon').data(tree.getTriangles()).remove();
+                reposition(tree.nodes[0]);
+            } //end refresh()
+
 
             //redraw the tree
             redraw = function () {
-                //this refreshes the svg groups to allow for 
                 d3.select('#nodes').selectAll('text').data(tree.getNodes()).exit().remove();
                 d3.select('#links').selectAll('line').data(tree.getLinks()).exit().remove();
+                d3.select('#triangles').selectAll('polygon').data(tree.getTriangles()).exit().remove();
+  
+                //nodes group
                 var nodes = d3.select('#nodes').selectAll('text').data(tree.getNodes());
 
-
-                nodes.text(function (node) { return node.text }).transition().duration(500)
+                nodes.text(function (node) { return node.text })
                     .attr('x', function (node) { return node.x; }).attr('y', function (node) { return node.y + 5; })
                     .attr('fill', function (node) { if (node.isLeaf) { return 'red'; } else { return 'blue'; } });
 
                 nodes.enter().append('text').attr('id', function (node) { return node.id; })
                     .attr('x', function (node) { return node.x; }).attr('y', function (node) { return node.y + 5; })
-                    .text(function (node) { return node.text; })
+                    .text(function (node) { return node.text; }) 
+                    .attr('textWidth', function (node) { return tree.getTextWidth(node, this.getBBox()); })
                     .style({ 'text-anchor': 'middle', 'cursor': 'pointer' })
-                    .on('click', function (node) { if (d3.event.shiftKey) { return tree.changeText(node); } else if (d3.event.ctrlKey) { return tree.removeLeaf(node); } else { return tree.addLeaf(node.id); } })
-                    .transition().duration(500)
+                    .on('click', function (node) { return tree.nodeClicked(node); })
                     .attr('x', function (node) { return node.x; }).attr('y', function (node) { return node.y + 5; });
 
-
+                //links group
                 var links = d3.select('#links').selectAll('line').data(tree.getLinks());
 
-                links.transition().duration(500)
-                    .attr('x1', function (link) { return link.fromX; }).attr('y1', function (link) { return link.fromY + 10; })
+                links.attr('x1', function (link) { return link.fromX; }).attr('y1', function (link) { return link.fromY + 10; })
                     .attr('x2', function (link) { return link.toX; }).attr('y2', function (link) { return link.toY - 10; });
 
                 links.enter().append('line')
                     .attr('x1', function (link) { return link.fromX; }).attr('y1', function (link) { return link.fromY + 10; })
                     .attr('x2', function (link) { return link.toX; }).attr('y2', function (link) { return link.toY - 10; })
                     .style({ 'stroke': 'lightgray', 'stroke-width': '3px' })
-                    .transition().duration(500)
+                    /*.transition().duration(500)*/
                     .attr('x2', function (link) { return link.toX; }).attr('y2', function (link) { return link.toY - 10; });
-                    
 
-            }
+                //triangles group   
+                var triangles = d3.select('#triangles').selectAll('polygon').data(tree.getTriangles());
+
+                triangles.attr('points', function (triangle) { return (triangle.topX + ',' + triangle.topY + ' ' + triangle.leftX + ',' + triangle.leftY + ' ' + triangle.rightX + ',' + triangle.rightY) });
+
+                triangles.enter().append('polygon')
+                    .attr('points', function (triangle) { return (triangle.topX + ',' + triangle.topY + ' ' + triangle.leftX + ',' + triangle.leftY + ' ' + triangle.rightX + ',' + triangle.rightY) })
+                    .style({ 'stroke': 'lightgray', 'stroke-width': '3px', 'fill': 'white' })
+                    .attr('points', function (triangle) { return (triangle.topX + ',' + triangle.topY + ' ' + triangle.leftX + ',' + triangle.leftY + ' ' + triangle.rightX + ',' + triangle.rightY) });
+            } //end redraw()
+
 
             //get leaf count for node
             getLeafCount = function (node) {
                 if (node.kids.length == 0) { return 1; }
                 else { return node.kids.map(getLeafCount).reduce(function (a, b) { return a + b; }); }
-            }
+            } //end getLeafCount()
+
 
             //update node positions
             reposition = function (node) {
@@ -244,13 +287,14 @@
                     redraw();
                 });
                 
-            }
+            } //end reposition()
+
 
             //convert svgTree to image 
             svgToImage = function () {
                 //get svg element.
                 var svg = d3.select("svg")[0][0];
-
+                
                 //get svg source.
                 var serializer = new XMLSerializer();
                 var source = serializer.serializeToString(svg);
@@ -271,77 +315,35 @@
 
                 //open the image in a new tab
                 var win = window.open(url, '_blank');
+
                 win.focus();
-/*
-                // Select the first svg element
-                var svg = d3.select("svg")[0][0],
-                    img = new Image(),
-                    serializer = new XMLSerializer(),
-                    svgStr = serializer.serializeToString(svg);
-                console.log(svg);
+            } //end svgToImage()
 
-                img.src = 'data:image/svg+xml;base64,' + window.btoa(svgStr);
-
-                // You could also use the actual string without base64 encoding it:
-                //img.src = "data:image/svg+xml;utf8," + svgStr;
-
-                var canvas = document.createElement("canvas");
-                document.body.appendChild(canvas);
-
-                canvas.width = svgWidth;
-                canvas.height = svgHeight;
-                canvas.getContext("2d").drawImage(img, 0, 0, svgWidth, svgHeight);
-                // Now save as png or whatever
-*/
-/*
-                var svg = document.querySelector("svg");
-                var svgData = new XMLSerializer().serializeToString(svg);
-
-                var canvas = document.createElement("canvas");
-                canvas.width = 1200;
-                canvas.height = 600;
-                var ctx = canvas.getContext("2d");
-
-                var img = document.createElement("img");
-                img.setAttribute("src", "data:image/svg+xml;base64," + btoa(svgData));
-
-                img.onload = function () {
-                    ctx.drawImage(img, 0, 0);
-
-                    // Now is done
-                    console.log(canvas.toDataURL("image/png"));
-                };
-*/
-
-            }
 
             //save the tree structure as JSON
             saveTree = function () {
                 JSONData = JSON.stringify(tree.nodes);
-                //console.log(JSONData);
-                loadTree();
-            }
+            } //end saveTree()
+
 
             //save the tree structure as JSON
             loadTree = function () {
                 tree.nodes = JSON.parse(JSONData);
-                reposition(tree.nodes[0]);
-                redraw();
-            }
+                refresh();
+            } //end loadTree()
+
 
             resetTree = function () {
                 tree.nodes = [];
-                tree.nodes.push({ id: 0, text: 'Clause', x: tree.cx, y: tree.cy, kids: [], isLeaf: false });
-                reposition(tree.nodes[0]);
+                tree.nodes.push({ id: '00', text: 'Clause', x: tree.cx, y: tree.cy, kids: [], isLeaf: false, textWidth: 0 });
                 redraw();
-            }
+            } //end resetTree()
+
 
             //set up the page
             initialise = function () {
-
-
                 //add the root node
-                tree.nodes.push({ id: 0, text: 'Clause', x: tree.cx, y: tree.cy, kids: [], isLeaf: false });
+                tree.nodes.push({ id: '00', text: 'Clause', x: tree.cx, y: tree.cy, kids: [], isLeaf: false, textWidth: 0 });
 
                 //create the svg
                 d3.select('body').style({ 'width': '1200px', 'margin': '10px auto' }).append('svg').attr('width', svgWidth).attr('height', svgHeight).attr('id', 'svgTree')
@@ -352,110 +354,75 @@
                     .enter().append('text').attr('id', function (node) { return node.id; })
                     .attr('x', function (node) { return node.x; }).attr('y', function (node) { return node.y + 5; })
                     .text(function (node) { return node.text; })
+                    .attr('textWidth', function (node) { var n = tree.getNode(node); n.textWidth = this.getBBox().width; return this.getBBox().width; })
                     .style({ 'text-anchor': 'middle', 'cursor': 'pointer' })
-                    .on('click', function (node) { return tree.addLeaf(node.id); });
+                    .on('click', function (node) { return tree.nodeClicked(node); });
+
 
                 //create group of links
                 d3.select('#svgTree').append('g').attr('id', 'links').selectAll('line').data(tree.getLinks())
                     .enter().append('line')
                     .attr('x1', function (link) { return link.fromX; }).attr('y1', function (link) { return link.fromY; })
                     .attr('x2', function (link) { return link.toX; }).attr('y2', function (link) { return link.toY; });
-                    
-                console.log(tree.getLinks());
-                if ((tree.getLinks()).length > 0) {
-                    console.log('Yep');
-                    d3.select('#svgTree').getElementById('links').selectAll('line').data(tree.getLinks())
-                    .enter().style('stroke:rgb(255,0,0);stroke-width:2;');
-                }
-                //Show the legend in top left corner
-                var controlsInfo = [
-                    { action: 'Add Leaf : ', buttons: ' Click on a Node', x: 5, y: 15 },
-                    { action: 'Remove Leaf : ', buttons: ' Hold Ctrl & Click on a Leaf', x: 5, y: 30 },
-                    { action: 'Change Node Text : ', buttons: ' Hold Shift & Click on a Node', x: 5, y: 45 }
-                ];
-                d3.select('#svgTree').append('g').attr('id', 'legend').selectAll('text').data(controlsInfo)
-                    .enter().append('text')
-                    .attr('x', function (c) { return c.x; }).attr('y', function (c) { return c.y; }).attr('font-size', 12).text(function (c) { return c.action; }).append('tspan').attr('x', 120).attr('y', function (c) { return c.y; }).text(function (c) { return c.buttons; });
-                    
-                //Show Buttons (Save etc.)
-                var svg = d3.select('#svgTree').append('g').attr('id', 'buttons');
-                var text = svg.append('text').text('Save').attr('dy', '1em').attr('transform', 'translate(1150,540)')
-                            .on('click', function () { saveTree(); });
-                var ctm = text[0][0].getCTM(),
-                    box = text[0][0].getBBox();
-                var rect = svg.insert('rect', 'text').attr('x', (box.x - 5)).attr('y', (box.y - 5)).attr('width', box.width + 10).attr('height', box.height + 10)
-                    .style({ 'fill': 'green' });
-                setTM = function (element, m) {
-                    return element.transform.baseVal.initialize(element.ownerSVGElement.createSVGTransformFromMatrix(m));
-                };
-                setTM(rect[0][0], ctm);
+       
+                //create group of triangles
+                d3.select('#svgTree').append('g').attr('id', 'triangles').selectAll('polygon').data(tree.getTriangles())
+                    .enter().append('polygon')
+                    .attr('points', function (triangle) { return (triangle.topX + ',' + triangle.topY + ' ' + triangle.leftX + ',' + triangle.leftY + ' ' + triangle.rightX + ',' + triangle.rightY) });
+
+
+                //Radio Buttons
+                var form = d3.select("body").append("form").attr('style', 'display:inline-block;');
+                form.append("label").attr('style', 'margin-right:10px').text("Add Node").insert("input").attr({ type: "radio", id: "radio1", name: "mode", value: 0 }).property("checked", true);
+                form.append("label").attr('style', 'margin-right:10px').text("Remove Leaf").insert("input").attr({ type: "radio", id: "radio2", name: "mode", value: 1 });
+                form.append("label").text("Change Text").insert("input").attr({ type: "radio", id: "radio3", name: "mode", value: 2 });
 
                 //Easy buttons at the bottom of the page
                 d3.select("body")
                     .append("button")
+                    .attr('style', 'float:right;')
                     .html("Export")
                     .on("click", svgToImage);
 
                 d3.select("body")
                     .append("button")
+                    .attr('style', 'float:right;')
                     .html("Save")
                     .on("click", saveTree);
 
                 d3.select("body")
                     .append("button")
+                    .attr('style', 'float:right;')
                     .html("Load")
                     .on("click", loadTree);
 
                 d3.select("body")
                     .append("button")
+                    .attr('style', 'float:right;')
                     .html("Reset")
                     .on("click", resetTree);
 
                 d3.select("body")
                     .append("button")
+                    .attr('style', 'float:right;')
                     .html("Depth")
-                    .on("click", function () { if (uniformDepth) { uniformDepth = false; } else { uniformDepth = true; } reposition(tree.nodes[0]); redraw(); } );
+                    .on("click", function () { if (uniformDepth) { this.style.background = '#ddd'; uniformDepth = false; } else { this.style.background = '#ccc'; uniformDepth = true; } refresh(); });
 
                 d3.select("body")
-                    .append("button").attr('id', 'addNode')
-                    .html("Add Node")
-                    .on("click", function () {
-                        if (!addNode) {
-                            addNode = true; document.getElementById('addNode').style.background = '#ccc';
-                            removeNode = false; document.getElementById('removeNode').style.background = '#ddd';
-                            changeText = false; document.getElementById('changeText').style.background = '#ddd';
-                        }
-                    });
-
-                d3.select("body")
-                    .append("button").attr('id', 'removeNode')
-                    .html("Remove Node")
-                    .on("click", function () {
-                        if (!removeNode) {
-                            addNode = false; document.getElementById('addNode').style.background = '#ddd';
-                            removeNode = true; document.getElementById('removeNode').style.background = '#ccc';
-                            changeText = false; document.getElementById('changeText').style.background = '#ddd';
-                        }
-                    });
-
-                d3.select("body")
-                    .append("button").attr('id', 'changeText')
-                    .html("Change Text")
-                    .on("click", function () {
-                        if (!changeText) {
-                            addNode = false; document.getElementById('addNode').style.background = '#ddd';
-                            removeNode = false; document.getElementById('removeNode').style.background = '#ddd';
-                            changeText = true; document.getElementById('changeText').style.background = '#ccc';
-                        }
-                    });
+                    .append("button")
+                    .attr('style', 'float:right;')
+                    .html("Example")
+                    .on("click", function () { tree.nodes = JSON.parse(example); refresh(); });
 
                 redraw();
-            }
+            } //end initialise()
 
             initialise();
 
             return tree;
-        }
+
+        } //end of tree()
+
         var tree = tree();
 
     </script>
