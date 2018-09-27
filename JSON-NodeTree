@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    
+</head>
+<body>
+
+    <script>
+        function tree () {
+            //width and height of svg
+            var svgWidth = 1200,
+                svgHeight = 600;
+            //tree object
+            var tree = {
+                cx: 600,
+                cy: 30,
+                w: 80,
+                h: 50,
+                size: 1,
+                leafDepth: 0,
+                nodes: []
+            };
+            //boolean to toggle depth
+            var uniformDepth = false;
+            //store the tree object here when saved
+            var JSONData;
+            //example tree layout
+            var example = '[{"id":"00","text":"Clause","x":600,"y":30,"kids":[{"id":"id1","text":"Goal","x":250,"y":90,"kids":[{"id":"id2","text":"Ngp","x":250,"y":150,"kids":[{"id":"id3","text":"th","x":250,"y":210,"kids":[{"id":"id4","text":"It","x":250,"y":270,"kids":[],"isLeaf":true,"textWidth":9.765625}],"isLeaf":false,"textWidth":12.4375}],"isLeaf":false,"textWidth":27.546875}],"isLeaf":false,"textWidth":31.09375},{"id":"id5","text":"Pr: material","x":350,"y":90,"kids":[{"id":"id6","text":"was delivered","x":350,"y":150,"kids":[],"isLeaf":true,"textWidth":88.40625}],"isLeaf":false,"textWidth":75.078125},{"id":"id7","text":"Circ: manner","x":700,"y":90,"kids":[{"id":"id8","text":"Advgp","x":500,"y":150,"kids":[{"id":"id10","text":"t","x":450,"y":210,"kids":[{"id":"id12","text":"very","x":450,"y":270,"kids":[],"isLeaf":true,"textWidth":28.421875}],"isLeaf":false,"textWidth":4.4375},{"id":"id11","text":"a","x":550,"y":210,"kids":[{"id":"id13","text":"quickly","x":550,"y":270,"kids":[],"isLeaf":true,"textWidth":47.984375}],"isLeaf":false,"textWidth":7.09375}],"isLeaf":false,"textWidth":43.546875},{"id":"id9","text":"PP","x":800,"y":150,"kids":[{"id":"id14","text":"&","x":650,"y":210,"kids":[{"id":"id17","text":"and","x":650,"y":270,"kids":[],"isLeaf":true,"textWidth":23.09375}],"isLeaf":false,"textWidth":12.4375},{"id":"id15","text":"p","x":750,"y":210,"kids":[{"id":"id18","text":"in","x":750,"y":270,"kids":[],"isLeaf":true,"textWidth":12.4375}],"isLeaf":false,"textWidth":8},{"id":"id16","text":"cv","x":900,"y":210,"kids":[{"id":"id19","text":"Ngp","x":900,"y":270,"kids":[{"id":"id20","text":"m","x":850,"y":330,"kids":[{"id":"id23","text":"Adjgp","x":850,"y":390,"kids":[{"id":"id24","text":"a","x":850,"y":450,"kids":[{"id":"id25","text":"good","x":850,"y":510,"kids":[],"isLeaf":true,"textWidth":32}],"isLeaf":false,"textWidth":7.09375}],"isLeaf":false,"textWidth":40}],"isLeaf":false,"textWidth":12.4375},{"id":"id21","text":"th","x":950,"y":330,"kids":[{"id":"id22","text":"order","x":950,"y":390,"kids":[],"isLeaf":true,"textWidth":33.75}],"isLeaf":false,"textWidth":12.4375}],"isLeaf":false,"textWidth":27.546875}],"isLeaf":false,"textWidth":15.09375}],"isLeaf":false,"textWidth":17.796875}],"isLeaf":false,"textWidth":83.96875}],"isLeaf":false,"textWidth":43.546875}]';
+            
+            //returns the nodes
+            tree.getNodes = function () {
+                var n = [];
+                function getNodes(node) {
+                    n.push({ id: node.id, text: node.text, x: node.x, y: node.y, kids: node.kids, isLeaf: node.isLeaf, textWidth: node.textWidth });
+                    node.kids.forEach(function (kid) { return getNodes(kid); });
+                }
+                getNodes(tree.nodes[0]);
+                return n.sort(function (a, b) { return a.id - b.id; });
+            } //end tree.getNodes()
+            //returns the links
+            tree.getLinks = function () {
+                var l = [];
+                function getLinks(node) {
+                    node.kids.forEach(function (kid) { if (!kid.isLeaf) { l.push({ fromId: node.id, fromX: node.x, fromY: node.y, toId: kid.id, toX: kid.x, toY: kid.y }); } });
+                    node.kids.forEach(getLinks);
+                }
+                getLinks(tree.nodes[0]);
+                return l.sort(function (a, b) { return a.toId - b.toId });
+            } //end tree.getLinks()
+            //returns the triangles
+            tree.getTriangles = function () {
+                var t = [];
+                function getTriangles(node) {
+                    node.kids.forEach(function (kid) { if (kid.isLeaf) { t.push({ fromId: node.id, toId: kid.id, topX: node.x, topY: (node.y + 10), leftX: (kid.x - (kid.textWidth / 2)), leftY: (kid.y - 10), rightX: (kid.x + (kid.textWidth / 2)), rightY: (kid.y - 10) }); } });
+                    node.kids.forEach(getTriangles);
+                }
+                getTriangles(tree.nodes[0]);
+                return t.sort(function (a, b) { return a.toId - b.toId });
+            } //end tree.getTriangles()
+            //returns node object
+            tree.getNode = function (thisNode) {
+                var n;
+                function getNode(node) {
+                    if (node.id == thisNode.id) { n = node; }
+                    node.kids.forEach(getNode);
+                }
+                getNode(tree.nodes[0]);
+                return n;
+            } //end tree.getNode()
+            //return nodes text width
+            tree.getTextWidth = function (node, box) {
+                var n = tree.getNode(node);
+                n.textWidth = box.width;
+                return box.width;
+            } //end tree.getTextWidth()
+            //when node is clicked, check which radio button is checked and run function
+            tree.nodeClicked = function (node) {
+                if(document.getElementById('radio1').checked) {
+                    tree.addLeaf(node)
+                }
+                else if (document.getElementById('radio2').checked) {
+                    tree.removeLeaf(node)
+                }
+                else {
+                    tree.changeText(node);
+                }
+            } //end tree.nodeClicked()
+            //add a new leaf to node
+            tree.addLeaf = function (parent) {
+                tree.size++;
+                function addLeaf(node) {
+                    if (node.id == parent.id) {
+                        node.kids.push({ id: (tree.size - 1), text: 'Node ' + (tree.size - 1), x: node.x, y: node.y, kids: [], isLeaf: true, textWidth: 0 }); node.isLeaf = false;
+                        refresh();
+                        return;
+                    }
+                    node.kids.forEach(addLeaf);
+                }
+                addLeaf(tree.nodes[0]);
+            } //end tree.addLeaf()
+            //remove leaf
+            tree.removeLeaf = function (nodeClicked) {
+                var parent = tree.nodes[0];
+                var visited = [];
+                function removeLeaf() {
+                    for (var i = 0; i < parent.kids.length; i++) {
+                        if (parent.kids[i].id == nodeClicked.id) { parent.kids.splice(i, 1);
+                            if (parent.kids.length == 0) { parent.isLeaf = true; }
+                        }
+                    }
+                } //end removeLeaf()
+                function findParent(node) { //finds the parent object of the leaf clicked and saves it to parent variable
+                    visited.push(node);
+                    if (node.id == nodeClicked.id) { visited.pop(); parent = visited[visited.length - 1]; removeLeaf(); }
+                    else { node.kids.forEach(findParent); visited.pop(); } //remove nodes down visited paths
+                } //end findParent()
+                if (nodeClicked.isLeaf) {
+                    findParent(tree.nodes[0]);
+                    refresh();
+                }
+            } //end tree.removeLeaf()
+            //change node text
+            tree.changeText = function (node) {
+                var newText = '';
+                var num = 0;
+                var textBox = d3.select("#nodes").append("foreignObject").attr("x", node.x + 50).attr("y", node.y)
+                                .attr("width", 300).attr("height", 25).append("xhtml:form")
+                                .append("input").attr("value", function () { this.focus(); return node.text })
+                                .on("blur", function () {
+                                    newText = textBox.node().value;
+                                    function changeText(n) {
+                                        if (n.id == node.id) { n.text = newText; refresh(); return; }
+                                        n.kids.forEach(changeText);
+                                    }
+                                    changeText(tree.nodes[0]);
+                                    refresh();
+                                    d3.select("foreignObject").remove();
+                                })
+                                .on("keypress", function () { 
+                                    if (d3.event.keyCode == 13) { //enter button
+                                        var e = d3.event;
+                                        //prevents the entire tree from deleting when enter is pressed
+                                        if (e.stopPropagation) { e.stopPropagation(); }
+                                        e.preventDefault();
+                                        newText = textBox.node().value;
+                                        function changeText(n) {
+                                            if (n.id == node.id) { n.text = newText; refresh(); return; }
+                                            n.kids.forEach(changeText);
+                                        }
+                                        changeText(tree.nodes[0]);
+                                        refresh();
+                                        d3.select("foreignObject").remove();
+                                    }
+                                });
+            } //end tree.changeText()
+            //sets leafs depth to deepest leaf
+            tree.nodeDepth = function () {
+                var leafs = [];
+                var depth = 0;
+                //check if nodes are leafs
+                function nodeDepth(n) {
+                    n.kids.forEach(function (kid) {
+                        if (kid.isLeaf) { leafs.push({ id: kid.id }); if (kid.y > depth) { depth = kid.y; } }
+                    });
+                    n.kids.forEach(nodeDepth);
+                }
+                function changeDepth(n) {
+                    n.kids.forEach(function (kid) {
+                        leafs.forEach(function (leaf) { if (kid.id == leaf.id) { kid.y = depth; } })
+                    });
+                    n.kids.forEach(changeDepth);
+                }
+                nodeDepth(tree.nodes[0]);
+                changeDepth(tree.nodes[0]);
+                tree.leafDepth = depth;
+            } //end tree.nodeDepth()
+            //update/refresh svg
+            refresh = function () {
+                d3.select('#nodes').selectAll('text').data(tree.getNodes()).remove();
+                d3.select('#links').selectAll('line').data(tree.getLinks()).remove();
+                d3.select('#triangles').selectAll('polygon').data(tree.getTriangles()).remove();
+                reposition(tree.nodes[0]);
+            } //end refresh()
+            //redraw the tree
+            redraw = function () {
+                d3.select('#nodes').selectAll('text').data(tree.getNodes()).exit().remove();
+                d3.select('#links').selectAll('line').data(tree.getLinks()).exit().remove();
+                d3.select('#triangles').selectAll('polygon').data(tree.getTriangles()).exit().remove();
+  
+                //nodes group
+                var nodes = d3.select('#nodes').selectAll('text').data(tree.getNodes());
+                nodes.text(function (node) { return node.text })
+                    .attr('x', function (node) { return node.x; }).attr('y', function (node) { return node.y + 5; })
+                    .attr('fill', function (node) { if (node.isLeaf) { return 'red'; } else { return 'blue'; } });
+                nodes.enter().append('text').attr('id', function (node) { return node.id; })
+                    .attr('x', function (node) { return node.x; }).attr('y', function (node) { return node.y + 5; })
+                    .text(function (node) { return node.text; }) 
+                    .attr('textWidth', function (node) { return tree.getTextWidth(node, this.getBBox()); })
+                    .style({ 'text-anchor': 'middle', 'cursor': 'pointer' })
+                    .on('click', function (node) { return tree.nodeClicked(node); })
+                    .attr('x', function (node) { return node.x; }).attr('y', function (node) { return node.y + 5; });
+                //links group
+                var links = d3.select('#links').selectAll('line').data(tree.getLinks());
+                links.attr('x1', function (link) { return link.fromX; }).attr('y1', function (link) { return link.fromY + 10; })
+                    .attr('x2', function (link) { return link.toX; }).attr('y2', function (link) { return link.toY - 10; });
+                links.enter().append('line')
+                    .attr('x1', function (link) { return link.fromX; }).attr('y1', function (link) { return link.fromY + 10; })
+                    .attr('x2', function (link) { return link.toX; }).attr('y2', function (link) { return link.toY - 10; })
+                    .style({ 'stroke': 'lightgray', 'stroke-width': '3px' })
+                    /*.transition().duration(500)*/
+                    .attr('x2', function (link) { return link.toX; }).attr('y2', function (link) { return link.toY - 10; });
+                //triangles group   
+                var triangles = d3.select('#triangles').selectAll('polygon').data(tree.getTriangles());
+                triangles.attr('points', function (triangle) { return (triangle.topX + ',' + triangle.topY + ' ' + triangle.leftX + ',' + triangle.leftY + ' ' + triangle.rightX + ',' + triangle.rightY) });
+                triangles.enter().append('polygon')
+                    .attr('points', function (triangle) { return (triangle.topX + ',' + triangle.topY + ' ' + triangle.leftX + ',' + triangle.leftY + ' ' + triangle.rightX + ',' + triangle.rightY) })
+                    .style({ 'stroke': 'lightgray', 'stroke-width': '3px', 'fill': 'white' })
+                    .attr('points', function (triangle) { return (triangle.topX + ',' + triangle.topY + ' ' + triangle.leftX + ',' + triangle.leftY + ' ' + triangle.rightX + ',' + triangle.rightY) });
+            } //end redraw()
+            //get leaf count for node
+            getLeafCount = function (node) {
+                if (node.kids.length == 0) { return 1; }
+                else { return node.kids.map(getLeafCount).reduce(function (a, b) { return a + b; }); }
+            } //end getLeafCount()
+            //update node positions
+            reposition = function (node) {
+                if (uniformDepth) {
+                    tree.nodeDepth();
+                }
+                var leafCount = getLeafCount(node),
+                    left = node.x - tree.w * (leafCount - 1) / 2;
+                node.kids.forEach(function (kid) {
+                    var w = tree.w * getLeafCount(kid);
+                    left += w;
+                    kid.x = left - (w + tree.w) / 2;
+                    kid.y = node.y + tree.h;
+                    reposition(kid);
+                    redraw();
+                });
+                
+            } //end reposition()
+            //convert svgTree to image 
+            svgToImage = function () {
+                //get svg element.
+                var svg = d3.select("svg")[0][0];
+                
+                //get svg source.
+                var serializer = new XMLSerializer();
+                var source = serializer.serializeToString(svg);
+                //add name spaces.
+                if (!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
+                    source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+                }
+                if (!source.match(/^<svg[^>]+"http\:\/\/www\.w3\.org\/1999\/xlink"/)) {
+                    source = source.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+                }
+                //add xml declaration
+                source = '<?xml version="1.0" standalone="no"?>\r\n' + source;
+                //convert svg source to URI data scheme.
+                var url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
+                //open the image in a new tab
+                var win = window.open(url, '_blank');
+                win.focus();
+            } //end svgToImage()
+            //save the tree structure as JSON
+            saveTree = function () {
+                JSONData = JSON.stringify(tree.nodes);
+                
+                var a = document.createElement("a");
+    						var file = new Blob([JSONData], {type: 'text/plain'});
+    						a.href = URL.createObjectURL(file);
+    						a.download = 'json.txt';
+    						a.click();
+                
+                
+            } //end saveTree()
+            //save the tree structure as JSON
+            loadTree = function () {
+            		var file = d3.event.target.files[0];
+              	var reader = new FileReader();
+                
+                	reader.onload = function() {
+                  	JSONData = this.result;
+                		tree.nodes = JSON.parse(JSONData);
+                    refresh();
+                }
+                reader.readAsText(file);
+                
+                
+                
+            } //end loadTree()
+            resetTree = function () {
+                tree.nodes = [];
+                tree.nodes.push({ id: '00', text: 'Clause', x: tree.cx, y: tree.cy, kids: [], isLeaf: false, textWidth: 0 });
+                redraw();
+            } //end resetTree()
+            //set up the page
+            initialise = function () {
+                //add the root node
+                tree.nodes.push({ id: '00', text: 'Clause', x: tree.cx, y: tree.cy, kids: [], isLeaf: false, textWidth: 0 });
+                //create the svg
+                d3.select('body').style({ 'width': '1200px', 'margin': '10px auto' }).append('svg').attr('width', svgWidth).attr('height', svgHeight).attr('id', 'svgTree')
+                    .style({ 'border': '1px solid gray' });
+                //create group of nodes
+                d3.select('#svgTree').append('g').attr('id', 'nodes').selectAll('text').data(tree.getNodes())
+                    .enter().append('text').attr('id', function (node) { return node.id; })
+                    .attr('x', function (node) { return node.x; }).attr('y', function (node) { return node.y + 5; })
+                    .text(function (node) { return node.text; })
+                    .attr('textWidth', function (node) { var n = tree.getNode(node); n.textWidth = this.getBBox().width; return this.getBBox().width; })
+                    .style({ 'text-anchor': 'middle', 'cursor': 'pointer' })
+                    .on('click', function (node) { return tree.nodeClicked(node); });
+                //create group of links
+                d3.select('#svgTree').append('g').attr('id', 'links').selectAll('line').data(tree.getLinks())
+                    .enter().append('line')
+                    .attr('x1', function (link) { return link.fromX; }).attr('y1', function (link) { return link.fromY; })
+                    .attr('x2', function (link) { return link.toX; }).attr('y2', function (link) { return link.toY; });
+       
+                //create group of triangles
+                d3.select('#svgTree').append('g').attr('id', 'triangles').selectAll('polygon').data(tree.getTriangles())
+                    .enter().append('polygon')
+                    .attr('points', function (triangle) { return (triangle.topX + ',' + triangle.topY + ' ' + triangle.leftX + ',' + triangle.leftY + ' ' + triangle.rightX + ',' + triangle.rightY) });
+                //Radio Buttons
+                var form = d3.select("body").append("form").attr('style', 'display:inline-block;');
+                form.append("label").attr('style', 'margin-right:10px').text("Add Node").insert("input").attr({ type: "radio", id: "radio1", name: "mode", value: 0 }).property("checked", true);
+                form.append("label").attr('style', 'margin-right:10px').text("Remove Leaf").insert("input").attr({ type: "radio", id: "radio2", name: "mode", value: 1 });
+                form.append("label").text("Change Text").insert("input").attr({ type: "radio", id: "radio3", name: "mode", value: 2 });
+                //Easy buttons at the bottom of the page
+                d3.select("body")
+                    /*.append("button")
+                    .attr('style', 'float:right;')
+                    .html("Load")
+                    .on("click", loadTree); */
+                    .append("input")
+                    .attr("type", "file")
+                    .attr("accept", ".txt")
+                    .attr('style', 'float:right;')
+                    .on("change", loadTree)
+                d3.select("body")
+                    .append("button")
+                    .attr('style', 'float:right;')
+                    .html("Save")
+                    .on("click", saveTree);
+                d3.select("body")
+                    .append("button")
+                    .attr('style', 'float:right;')
+                    .html("Export")
+                    .on("click", svgToImage);
+                d3.select("body")
+                    .append("button")
+                    .attr('style', 'float:right;')
+                    .html("Reset")
+                    .on("click", resetTree);
+                d3.select("body")
+                    .append("button")
+                    .attr('style', 'float:right;')
+                    .html("Depth")
+                    .on("click", function () { if (uniformDepth) { this.style.background = '#ddd'; uniformDepth = false; } else { this.style.background = '#ccc'; uniformDepth = true; } refresh(); });
+                d3.select("body")
+                    .append("button")
+                    .attr('style', 'float:right;')
+                    .html("Example")
+                    .on("click", function () { tree.nodes = JSON.parse(example); refresh(); });
+                redraw();
+            } //end initialise()
+            initialise();
+            return tree;
+        } //end of tree()
+        var tree = tree();
+    </script>
+
+    
+
+</body>
+</html>
